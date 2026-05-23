@@ -191,29 +191,34 @@ class ValueBetDetector:
         odds: list[ScrapedOdd],
         fair_probs: list[float],
     ) -> tuple[list[float], Optional[PoissonResult], str]:
-        """
-        Retourne (real_probs, poisson_result, source_label).
-        Tente les sources dans l'ordre décroissant de fiabilité.
-        """
-        is_football_1x2 = (
-            match.sport == Sport.FOOTBALL
-            and market_name == "1X2"
-            and len(odds) == 3
-        )
+        is_football = match.sport == Sport.FOOTBALL
+        is_1x2 = market_name == "1X2" and len(odds) == 3
+        is_ou = market_name.startswith("O/U") and len(odds) == 2
+        is_hc = market_name == "Handicap" and len(odds) == 2
 
-        if is_football_1x2 and self.use_poisson:
-            # --- Tentative 1 : stats réelles football-data.org ---
-            if self._stats_provider:
+        if is_football and self.use_poisson and (is_1x2 or is_ou or is_hc):
+            # Tentative stats réelles (1X2 seulement)
+            if is_1x2 and self._stats_provider:
                 result = self._poisson_with_real_stats(match, odds, fair_probs)
                 if result:
                     probs, poisson = result
                     return probs, poisson, "real_stats"
 
-            # --- Tentative 2 : Poisson avec équipes moyennes ---
-            probs, poisson = self._poisson_with_average_teams(match, odds, fair_probs)
-            return probs, poisson, "poisson_avg"
+            # Poisson équipes moyennes
+            poisson = self._get_average_poisson(match)
 
-        # --- Fallback : probabilités équilibrées ---
+            if is_1x2:
+                probs = self._blend_poisson_fair(poisson, [o.outcome for o in odds], fair_probs)
+                return probs, poisson, "poisson_avg"
+
+            if is_ou:
+                probs = self._ou_probs_from_poisson(market_name, odds, poisson, fair_probs)
+                return probs, poisson, "poisson_avg"
+
+            if is_hc:
+                probs = self._handicap_probs_from_poisson(odds, poisson, fair_probs)
+                return probs, poisson, "poisson_avg"
+
         return fair_probs, None, "fair_prob"
 
     def _poisson_with_real_stats(
@@ -267,19 +272,84 @@ class ValueBetDetector:
         )
         return home_stats, away_stats, home_avg, away_avg
 
-    def _poisson_with_average_teams(
-        self,
-        match: ScrapedMatch,
-        odds: list[ScrapedOdd],
-        fair_probs: list[float],
-    ) -> tuple[list[float], PoissonResult]:
+    def _get_average_poisson(self, match: ScrapedMatch) -> PoissonResult:
         """Poisson sans stats réelles — équipes moyennes (force = 1.0)."""
-        poisson = poisson_match_probabilities(
+        return poisson_match_probabilities(
             home=TeamStats.average(match.home_team),
             away=TeamStats.average(match.away_team),
         )
-        probs = self._blend_poisson_fair(poisson, [o.outcome for o in odds], fair_probs)
-        return probs, poisson
+
+    @staticmethod
+    def _ou_probs_from_poisson(
+        market_name: str,
+        odds: list[ScrapedOdd],
+        poisson: PoissonResult,
+        fair_probs: list[float],
+        blend: float = 0.60,
+    ) -> list[float]:
+        """Calcule P(Over) / P(Under) via la matrice de scores Poisson."""
+        try:
+            threshold = float(market_name.split()[-1])  # "O/U 2.5" → 2.5
+        except (ValueError, IndexError):
+            threshold = 2.5
+
+        p_over = sum(
+            p for (h, a), p in poisson.score_matrix.items()
+            if h + a > threshold
+        )
+        p_under = 1.0 - p_over
+
+        # Associe Over/Under aux bonnes cotes
+        probs_poisson = []
+        for o in odds:
+            lbl = o.outcome.lower()
+            if "over" in lbl:
+                probs_poisson.append(p_over)
+            else:
+                probs_poisson.append(p_under)
+
+        # Blend Poisson 60% + fair_prob 40%
+        blended = [blend * pp + (1 - blend) * fp for pp, fp in zip(probs_poisson, fair_probs)]
+        total = sum(blended)
+        return [p / total for p in blended]
+
+    @staticmethod
+    def _handicap_probs_from_poisson(
+        odds: list[ScrapedOdd],
+        poisson: PoissonResult,
+        fair_probs: list[float],
+        blend: float = 0.55,
+    ) -> list[float]:
+        """Calcule les probabilités de handicap via la matrice de scores Poisson."""
+        # Extrait le handicap depuis le label (ex: "Dom -1.5" → -1.5)
+        hc_home = 0.0
+        for o in odds:
+            parts = o.outcome.split()
+            for part in parts:
+                try:
+                    hc_home = float(part)
+                    break
+                except ValueError:
+                    continue
+            if "dom" in o.outcome.lower():
+                break
+
+        p_home_hc = sum(
+            p for (h, a), p in poisson.score_matrix.items()
+            if (h - a + hc_home) > 0
+        )
+        p_away_hc = 1.0 - p_home_hc
+
+        probs_poisson = []
+        for o in odds:
+            if "dom" in o.outcome.lower():
+                probs_poisson.append(p_home_hc)
+            else:
+                probs_poisson.append(p_away_hc)
+
+        blended = [blend * pp + (1 - blend) * fp for pp, fp in zip(probs_poisson, fair_probs)]
+        total = sum(blended)
+        return [p / total for p in blended]
 
     @staticmethod
     def _blend_poisson_fair(
