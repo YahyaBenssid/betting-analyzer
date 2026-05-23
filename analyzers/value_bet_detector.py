@@ -197,9 +197,18 @@ class ValueBetDetector:
         fair_probs: list[float],
     ) -> tuple[list[float], Optional[PoissonResult], str]:
         is_football = match.sport == Sport.FOOTBALL
+        is_tennis = match.sport == Sport.TENNIS
         is_1x2 = market_name == "1X2" and len(odds) == 3
+        is_h2h = market_name in ("1X2", "Vainqueur") and len(odds) == 2
         is_ou = market_name.startswith("O/U") and len(odds) == 2
         is_hc = market_name == "Handicap" and len(odds) == 2
+
+        # Tennis — modèle Elo
+        if is_tennis and (is_1x2 or is_h2h):
+            elo_result = self._tennis_elo_probs(match, odds, fair_probs)
+            if elo_result:
+                probs, source = elo_result
+                return probs, None, source
 
         if is_football and self.use_poisson and (is_1x2 or is_ou or is_hc):
             # Tentative stats réelles (1X2 seulement)
@@ -276,6 +285,30 @@ class ValueBetDetector:
             home_task, away_task, avgs_task
         )
         return home_stats, away_stats, home_avg, away_avg
+
+    @staticmethod
+    def _tennis_elo_probs(
+        match: ScrapedMatch,
+        odds: list[ScrapedOdd],
+        fair_probs: list[float],
+        blend: float = 0.70,
+    ) -> tuple[list[float], str] | None:
+        """Blend 70% Elo + 30% consensus pour le tennis."""
+        try:
+            from analyzers.tennis_model import tennis_win_probability
+            result = tennis_win_probability(match.home_team, match.away_team, match.league)
+            if result is None:
+                return None
+            p_home_elo, p_away_elo = result
+            elo_map = {"domicile": p_home_elo, "extérieur": p_away_elo,
+                       "home": p_home_elo, "away": p_away_elo}
+            probs_elo = [elo_map.get(o.outcome.lower(), fair_probs[i])
+                         for i, o in enumerate(odds)]
+            blended = [blend * pe + (1 - blend) * fp for pe, fp in zip(probs_elo, fair_probs)]
+            total = sum(blended)
+            return [p / total for p in blended], "real_stats"
+        except Exception:
+            return None
 
     def _get_average_poisson(self, match: ScrapedMatch) -> PoissonResult:
         """Poisson sans stats réelles — équipes moyennes (force = 1.0)."""
