@@ -124,9 +124,12 @@ export default function ValueBetsTable({ bets, loading }: Props) {
                   <td className="py-2.5 px-3 text-fg-soft text-xs">{bet.market}</td>
                   <td className="py-2.5 px-3">
                     <span className={clsx("text-xs font-medium px-2 py-0.5 rounded border", {
-                      "bg-jade/10 text-jade border-jade/20": bet.outcome.toLowerCase() === "home",
-                      "bg-gold/10 text-gold border-gold/20": bet.outcome.toLowerCase() === "draw",
-                      "bg-fg-faint/10 text-fg-soft border-border": bet.outcome.toLowerCase() === "away",
+                      "bg-jade/10 text-jade border-jade/20":
+                        bet.outcome === "Domicile" || bet.outcome.startsWith("Over") || bet.outcome.startsWith("Dom"),
+                      "bg-gold/10 text-gold border-gold/20":
+                        bet.outcome === "Nul",
+                      "bg-fg-faint/10 text-fg-soft border-border":
+                        bet.outcome === "Extérieur" || bet.outcome.startsWith("Under") || bet.outcome.startsWith("Ext"),
                     })}>
                       {bet.outcome}
                     </span>
