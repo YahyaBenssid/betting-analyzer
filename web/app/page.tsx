@@ -21,7 +21,7 @@ export default function Dashboard() {
   const { data, error, isLoading, mutate, isValidating } = useSWR(
     scanKey(params),
     swrFetcher,
-    { refreshInterval: 60_000, revalidateOnFocus: false },
+    { refreshInterval: 900_000, revalidateOnFocus: false },
   );
 
   const apply = useCallback(() => { setParams(pending); setSidebarOpen(false); }, [pending]);

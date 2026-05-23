@@ -18,11 +18,42 @@ from .base_scraper import BaseScraper, ScrapedMatch, ScrapedOdd, ScraperError
 
 # Mapping sport → clé The Odds API
 SPORT_KEY_MAP = {
-    Sport.FOOTBALL: ["soccer_france_ligue1", "soccer_epl", "soccer_spain_la_liga",
-                     "soccer_germany_bundesliga", "soccer_italy_serie_a", "soccer_uefa_champs_league"],
-    Sport.TENNIS: ["tennis_atp_french_open", "tennis_wta_french_open"],
-    Sport.BASKETBALL: ["basketball_nba", "basketball_euroleague"],
-    Sport.HOCKEY: ["icehockey_nhl"],
+    Sport.FOOTBALL: [
+        "soccer_epl",                       # Premier League
+        "soccer_spain_la_liga",             # La Liga
+        "soccer_germany_bundesliga",        # Bundesliga
+        "soccer_italy_serie_a",             # Serie A
+        "soccer_france_ligue1",             # Ligue 1
+        "soccer_uefa_champs_league",        # Champions League
+        "soccer_uefa_europa_league",        # Europa League
+        "soccer_portugal_primeira_liga",    # Primeira Liga
+        "soccer_netherlands_eredivisie",    # Eredivisie
+        "soccer_england_efl_champ",         # Championship
+        "soccer_turkey_super_league",       # Süper Lig
+        "soccer_brazil_campeonato",         # Brasileirão
+        "soccer_usa_mls",                   # MLS
+        "soccer_argentina_primera_division",# Primera División
+        "soccer_mexico_ligamx",             # Liga MX
+    ],
+    Sport.TENNIS: [
+        "tennis_atp_french_open",           # Roland Garros ATP
+        "tennis_wta_french_open",           # Roland Garros WTA
+        "tennis_atp_rome",                  # Rome Masters
+        "tennis_atp_queens",                # Queens Club
+        "tennis_atp_halle",                 # Halle Open
+        "tennis_wta_rome",                  # WTA Rome
+        "tennis_atp_us_open",               # US Open
+        "tennis_wta_us_open",               # WTA US Open
+        "tennis_atp_wimbledon",             # Wimbledon
+        "tennis_wta_wimbledon",             # Wimbledon WTA
+    ],
+    Sport.BASKETBALL: [
+        "basketball_nba",                   # NBA
+        "basketball_nba_championship_winner",  # NBA futures
+        "basketball_euroleague",            # EuroLeague
+        "basketball_ncaab",                 # NCAA Basketball
+    ],
+    Sport.HOCKEY: ["icehockey_nhl", "icehockey_nhl_championship_winner"],
 }
 
 BASE_URL = "https://api.the-odds-api.com/v4"
