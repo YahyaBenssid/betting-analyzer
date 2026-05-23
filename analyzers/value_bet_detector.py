@@ -295,8 +295,11 @@ class ValueBetDetector:
         """
         poisson_map = {
             "home": poisson.prob_home_win,
+            "domicile": poisson.prob_home_win,
             "draw": poisson.prob_draw,
+            "nul": poisson.prob_draw,
             "away": poisson.prob_away_win,
+            "extérieur": poisson.prob_away_win,
         }
         blended = [
             poisson_weight * poisson_map.get(o.lower(), fp) + (1 - poisson_weight) * fp
