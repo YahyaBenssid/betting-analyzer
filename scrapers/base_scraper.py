@@ -32,6 +32,9 @@ class ScrapedMatch:
     league: str
     start_time: datetime
     markets: dict[str, list[ScrapedOdd]] = field(default_factory=dict)
+    # Probabilités consensus multi-bookmakers (après suppression de la vig)
+    # Clé = marché, valeur = liste de probs dans le même ordre que markets[marché]
+    consensus_probs: dict[str, list[float]] = field(default_factory=dict)
     source: str = "unknown"
 
     @property

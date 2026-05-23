@@ -151,7 +151,12 @@ class ValueBetDetector:
             return []
 
         impl_probs = [1.0 / o.value for o in valid_odds]
-        fair_probs = remove_vig(impl_probs)
+        # Utilise consensus_probs (multi-bookmakers) si disponible, sinon remove_vig
+        consensus = match.consensus_probs.get(market_name)
+        if consensus and len(consensus) == len(valid_odds):
+            fair_probs = consensus
+        else:
+            fair_probs = remove_vig(impl_probs)
 
         real_probs, poisson_result, source = self._estimate_real_probabilities(
             match, market_name, valid_odds, fair_probs

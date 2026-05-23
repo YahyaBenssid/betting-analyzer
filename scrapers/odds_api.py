@@ -150,7 +150,9 @@ class OddsAPIClient(BaseScraper):
         except (ValueError, AttributeError):
             start_time = datetime.now(tz=timezone.utc)
 
-        markets: dict[str, list[ScrapedOdd]] = {}
+        # Collecte toutes les cotes de tous les bookmakers par marché
+        # Structure: {market_label: {outcome_label: [odd1, odd2, ...]}}
+        all_bk_odds: dict[str, dict[str, list[float]]] = {}
 
         for bookmaker in event.get("bookmakers", []):
             bk_name = bookmaker.get("title", "unknown")
@@ -159,8 +161,36 @@ class OddsAPIClient(BaseScraper):
                 market_label, odds_list = OddsAPIClient._parse_market(
                     market_key, market.get("outcomes", []), home, away, bk_name
                 )
-                if market_label and odds_list and market_label not in markets:
-                    markets[market_label] = odds_list
+                if not market_label or not odds_list:
+                    continue
+                if market_label not in all_bk_odds:
+                    all_bk_odds[market_label] = {}
+                for o in odds_list:
+                    all_bk_odds[market_label].setdefault(o.outcome, []).append(o.value)
+
+        if not all_bk_odds:
+            return None
+
+        # Construit markets (meilleures cotes) + consensus_probs (probs moyennes)
+        markets: dict[str, list[ScrapedOdd]] = {}
+        consensus_probs: dict[str, list[float]] = {}
+
+        for market_label, outcome_odds in all_bk_odds.items():
+            outcomes = list(outcome_odds.keys())
+            if len(outcomes) < 2:
+                continue
+
+            # Meilleures cotes disponibles pour chaque outcome
+            best_odds = [ScrapedOdd(o, max(outcome_odds[o]), "best") for o in outcomes]
+            markets[market_label] = best_odds
+
+            # Probabilité consensus = moyenne des probs implicites, normalisée
+            avg_implied = [
+                sum(1.0 / v for v in outcome_odds[o]) / len(outcome_odds[o])
+                for o in outcomes
+            ]
+            total = sum(avg_implied)
+            consensus_probs[market_label] = [p / total for p in avg_implied]
 
         if not markets:
             return None
@@ -173,6 +203,7 @@ class OddsAPIClient(BaseScraper):
             league=league,
             start_time=start_time,
             markets=markets,
+            consensus_probs=consensus_probs,
             source="the-odds-api",
         )
 
