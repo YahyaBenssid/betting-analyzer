@@ -1,6 +1,5 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "pip install -r api/requirements.txt && playwright install chromium --with-deps"
 
 [deploy]
 startCommand = "cd api && uvicorn server:app --host 0.0.0.0 --port $PORT"
